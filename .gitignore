@@ -1,5 +1,5 @@
 */
-!models/
+!models/*
 !evaluation_metrics/
 !settings/
 *- コピー.py
