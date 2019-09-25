@@ -1,0 +1,32 @@
+[
+    {
+        "base_ch": 128,
+        "batch_size": 256,
+        "use_multi_gpu": true
+    },
+    {
+        "base_ch": 64,
+        "batch_size": 512,
+        "use_multi_gpu": true
+    },
+    {
+        "base_ch": 32,
+        "batch_size": 1024,
+        "use_multi_gpu": true
+    },
+    {
+        "base_ch": 128,
+        "batch_size": 128,
+        "use_multi_gpu": false
+    },
+    {
+        "base_ch": 64,
+        "batch_size": 256,
+        "use_multi_gpu": false
+    },
+    {
+        "base_ch": 32,
+        "batch_size": 512,
+        "use_multi_gpu": false
+    }
+]

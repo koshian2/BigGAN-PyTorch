@@ -1,1 +1,6 @@
-
+*/
+!models/
+!evaluation_metrics/
+!settings/
+*- コピー.py
+sandbox.py
