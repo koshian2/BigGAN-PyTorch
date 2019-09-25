@@ -1,5 +1,6 @@
 */
-!models/*
+!models/
+!models/sync_batchnorm/
 !evaluation_metrics/
 !settings/
 *- コピー.py
