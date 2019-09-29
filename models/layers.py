@@ -32,7 +32,39 @@ class SNLinear(nn.Module):
         return self.linear(inputs)
 
 ## Self attention
+# A non-local block as used in SA-GAN
+# Note that the implementation as described in the paper is largely incorrect;
+# refer to the released code for the actual implementation.
 class SelfAttention(nn.Module):
+    def __init__(self, ch):
+        super(SelfAttention, self).__init__()
+        # Channel multiplier
+        self.ch = ch
+        self.theta = SNConv2d(self.ch, self.ch // 8, kernel_size=1, bias=False)
+        self.phi = SNConv2d(self.ch, self.ch // 8, kernel_size=1, bias=False)
+        self.g = SNConv2d(self.ch, self.ch // 2, kernel_size=1, bias=False)
+        self.o = SNConv2d(self.ch // 2, self.ch, kernel_size=1, bias=False)
+        # Learnable gain parameter
+        self.gamma = nn.Parameter(torch.tensor(0.), requires_grad=True)
+
+    def forward(self, x, y=None):
+        # Apply convs
+        theta = self.theta(x) # [B, C/8, H, W]
+        phi = F.max_pool2d(self.phi(x), [2,2]) # [B, C/8, H/2, W/2]
+        g = F.max_pool2d(self.g(x), [2,2]) # [B, C/2, H/2, W/2]
+        # Perform reshapes
+
+        theta = theta.view(-1, self. ch // 8, x.shape[2] * x.shape[3]) # [B, C/8, HW]
+        phi = phi.view(-1, self. ch // 8, x.shape[2] * x.shape[3] // 4) # [B, C/8, HW/4]
+        g = g.view(-1, self. ch // 2, x.shape[2] * x.shape[3] // 4) # [B, C/2, HW/4]
+        # Matmul and softmax to get attention maps
+        beta = F.softmax(torch.bmm(theta.transpose(1, 2), phi), -1)  # [B, HW, HW/4]
+        # Attention map times g path
+        o = self.o(torch.bmm(g, beta.transpose(1, 2)).view(-1, self.ch // 2, x.shape[2], x.shape[3]))
+                # [B, C/2, HW] -> [B, C/2, H, W] -> [B, C, H, W]
+        return self.gamma * o + x
+
+""" class SelfAttention(nn.Module):
     def __init__(self, dims):
         super().__init__()
         self.conv_theta = SNConv2d(dims, dims // 8, kernel_size=1, bias=False)
@@ -58,12 +90,12 @@ class SelfAttention(nn.Module):
         g = F.max_pool2d(g, kernel_size=2)  # (B, C/2, H/2, W/2)
         g = g.view(batch, ch // 2, height * width // 4).permute([0, 2, 1])  # (B, HW/4, C/2)
 
-        attn_g = torch.bmm(attn, g)  # (B, HW, C/2)
+        attn_g = torch.bmm(g, attn.transpose(1,2))  # (B, HW, C/2)
         attn_g = attn_g.permute([0, 2, 1]).view(batch, ch // 2, height, width)  # (B, C/2, H, W)
         attn_g = self.conv_attn(attn_g)
         return inputs + self.sigma_ratio * attn_g
-
-
+ """
+ 
 ## BigGAN-deep version of conditional batch norm
 ## Shared embeddings, sync batch norm
 class ConditionalBatchNorm(nn.Module):

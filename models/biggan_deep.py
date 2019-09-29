@@ -87,33 +87,33 @@ def G_arch(ch=64, attention='64'):
 ## paper setting = base_ch = 128 
 ## ImageNet base (n_classes=1000, n_projectd_dims=128)
 # --- resolution = 32 ---
-# base_ch=16, params=793,190
-# base_ch=32, params=1,568,838
-# base_ch=48, params=2,455,078
-# base_ch=64, params=3,451,910
-# base_ch=96, params=5,777,350
-# base_ch=128, params=8,545,158
+# base_ch=16, params=777,827
+# base_ch=32, params=1,507,395
+# base_ch=48, params=2,316,835
+# base_ch=64, params=3,206,147
+# base_ch=96, params=5,224,387
+# base_ch=128, params=7,562,115
 # --- resolution = 64 ---
-# base_ch=16, params=2,861,247
-# base_ch=32, params=6,598,135
-# base_ch=48, params=11,338,799
-# base_ch=64, params=17,083,239
-# base_ch=96, params=31,583,447
-# base_ch=128, params=50,098,759
+# base_ch=16, params=2,753,724
+# base_ch=32, params=6,168,052
+# base_ch=48, params=10,371,116
+# base_ch=64, params=15,362,916
+# base_ch=96, params=27,712,724
+# base_ch=128, params=43,217,476
 # --- resolution = 128 ---
-# base_ch=16, params=2,914,532
-# base_ch=32, params=6,709,632
-# base_ch=48, params=11,513,436
-# base_ch=64, params=17,325,944
-# base_ch=96, params=31,977,072
-# base_ch=128, params=50,663,016
+# base_ch=16, params=2,806,688
+# base_ch=32, params=6,278,268
+# base_ch=48, params=10,542,872
+# base_ch=64, params=15,600,500
+# base_ch=96, params=28,094,828
+# base_ch=128, params=43,761,252
 # --- resolution = 256 ---
-# base_ch=16, params=3,218,085
-# base_ch=32, params=7,464,193
-# base_ch=48, params=12,866,461
-# base_ch=64, params=19,424,889
-# base_ch=96, params=36,010,225
-# base_ch=128, params=57,220,201
+# base_ch=16, params=3,093,600
+# base_ch=32, params=6,966,268
+# base_ch=48, params=11,746,136
+# base_ch=64, params=17,433,204
+# base_ch=96, params=31,528,940
+# base_ch=128, params=49,253,476
 
 class Generator(nn.Module):
     def __init__(self, base_ch, resolution, n_classes, n_projected_dims=32, n_latent_dims=128):
@@ -155,7 +155,8 @@ class Generator(nn.Module):
                 GBlock(in_ch, out_ch, 2 if upsample else 1, embedding_dims)                
             )
             # Non-Local block if needed (Self-attention)
-            blocks.append(SelfAttention(out_ch))
+            if attention:
+                blocks.append(SelfAttention(out_ch))
         self.main = MultiSeqential(*blocks)
             
         # final layers (not to use SNConv or Conditional BN)
@@ -308,5 +309,3 @@ class Discriminator(nn.Module):
         logit = self.linear_out(h)
         h = self.proj_embedding(h, logit, y)
         return h
-
-            

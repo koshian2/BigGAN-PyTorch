@@ -15,68 +15,59 @@ from models.biggan_deep import Generator, Discriminator
 from models.sync_batchnorm import DataParallelWithCallback
 from evaluate import inceptions_score_fid_all
 
-p = argparse.ArgumentParser(description="train CIFAR-10 basic")
-p.add_argument("--base_ch", help="base chs of BigGAN-deep", default=128)
-p.add_argument("--batch_size", help="batch size", default=128)
-p.add_argument("--use_multi_gpu", help="flag of data parallel", default=True)
-
-# base_ch = 128 (G=5,084,975, D=2,581,249)
-# base_ch = 64 (G=1,903,535, D=651,649)
-# base_ch = 32 (G=792,047, D=166,081)
+p = argparse.ArgumentParser(description="train 128x128")
+p.add_argument("--dataset", help="name of dataset", default="anime")
+p.add_argument("--data_root_dir", help="root directory of data", default="thumb")
+p.add_argument("--n_epoch", help="# epochs", default=1)
+p.add_argument("--n_classes", help="# classes", default=176)
+p.add_argument("--n_projected_dims", help="# projected onehot dims", default=32)
 
 args = p.parse_args()
 
-def load_cifar(batch_size):
+def load_dataset(batch_size):
     trans = transforms.Compose([
+        transforms.Resize(size=(128, 128)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    dataset = torchvision.datasets.CIFAR10(root="./data", train=True,
-                transform=trans, download=True)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                shuffle=True, num_workers=4)
+    dataset = torchvision.datasets.ImageFolder(root="./data/"+args.data_root_dir, transform=trans)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     return dataloader
 
 def train(cases):
     utils.load_settings(args, "settings/cifar.json", cases)
     
-    output_dir = f"cifar_case{cases}"
+    output_dir = f"res128_case{cases}"
 
-    device = "cuda" if args.use_multi_gpu else "cuda:1"
+    device = "cuda"
     torch.backends.cudnn.benchmark = True
-
-    # update G = 40k
-    nb_epoch = 200 * args.batch_size // 128 + 1  # 128:201, 256:401, ...
-    sampling_period = args.batch_size // 128  # 128:1, 256:2, ...
-    model_save_period = sampling_period * 5  # 128:5, 256:10, ...
     
     print("--- Conditions ---")
     print("- Case : ", cases)
     print(args)
-    print("nb_epoch :", nb_epoch)
     
-    dataloader = load_cifar(args.batch_size)
+    batch_size = 64
+    dataloader = load_dataset(batch_size)
 
-    model_G = Generator(args.base_ch, 32, 10, n_projected_dims=4)
-    model_G_ema = Generator(args.base_ch, 32, 10, n_projected_dims=4)
-    model_D = Discriminator(args.base_ch, 32, 10)
+    model_G = Generator(64, 128, args.n_classes, n_projected_dims=args.n_projected_dims)
+    model_G_ema = Generator(64, 128, args.n_classes, n_projected_dims=args.n_projected_dims)
+    model_D = Discriminator(64, 128, args.n_classes)
     model_G, model_D = model_G.to(device), model_D.to(device)
     model_G_ema = model_G_ema.to(device)
 
-    if args.use_multi_gpu:
-        model_G, model_D = DataParallelWithCallback(model_G), DataParallelWithCallback(model_D)
-        model_G_ema = DataParallelWithCallback(model_G_ema)
+    model_G, model_D = DataParallelWithCallback(model_G), DataParallelWithCallback(model_D)
+    model_G_ema = DataParallelWithCallback(model_G_ema)
 
     param_G = torch.optim.Adam(model_G.parameters(), lr=5e-5, betas=(0, 0.999))
     param_D = torch.optim.Adam(model_D.parameters(), lr=2e-4, betas=(0, 0.999))
 
     result = {"d_loss": [], "g_loss": []}
     n = len(dataloader)
-    onehot_encoding = torch.eye(10).to(device)
+    onehot_encoding = torch.eye(args.n_classes).to(device)
 
     fake_img, fake_onehots = None, None
     ema = utils.EMA(model_G, model_G_ema)
-    gan_loss = utils.HingeLoss(args.batch_size, device)
+    gan_loss = utils.HingeLoss(batch_size, device)
     update_G_counter = 1  # G:D=1:2
     
     def generate_fake_imgs(batch_len, labels):
@@ -86,12 +77,12 @@ def train(cases):
         fake_img = model_G(rand_X, fake_onehots)
         return fake_img, fake_onehots
 
-    for epoch in range(nb_epoch):
+    for epoch in range(args.n_epoch):
         log_loss_D, log_loss_G = [], []
 
         for i, (real_img, labels) in tqdm(enumerate(dataloader), total=n):
             batch_len = len(real_img)
-            if batch_len != args.batch_size: continue
+            if batch_len != batch_size: continue
 
             real_img = real_img.to(device)
             real_onehots = onehot_encoding[labels.to(device)]
@@ -147,19 +138,19 @@ def train(cases):
         print(f"epoch = {epoch}, g_loss = {result['g_loss'][-1]}, d_loss = {result['d_loss'][-1]}")        
             
         # save screen shot
-        if epoch % sampling_period == 0:
+        if epoch % 1 == 0:
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
-            torchvision.utils.save_image(fake_img[:64], f"{output_dir}/epoch_{epoch:03}.png",
-                                        nrow=8, padding=2, normalize=True, range=(-1.0, 1.0))
+            torchvision.utils.save_image(fake_img[:25], f"{output_dir}/epoch_{epoch:03}.png",
+                                        nrow=5, padding=3, normalize=True, range=(-1.0, 1.0))
                                         
         # save weights
-        if epoch % model_save_period == 0:
+        if epoch % 5 == 0:
             if not os.path.exists(output_dir + "/models"):
                 os.mkdir(output_dir+"/models")
-            utils.save_model(model_G, f"{output_dir}/models/gen_epoch_{epoch:03}.pytorch", args.use_multi_gpu)
-            utils.save_model(model_G_ema, f"{output_dir}/models/gen_ema_epoch_{epoch:03}.pytorch", args.use_multi_gpu)
-            utils.save_model(model_D, f"{output_dir}/models/dis_epoch_{epoch:03}.pytorch", args.use_multi_gpu)
+            utils.save_model(model_G, f"{output_dir}/models/gen_epoch_{epoch:03}.pytorch", True)
+            utils.save_model(model_G_ema, f"{output_dir}/models/gen_ema_epoch_{epoch:03}.pytorch", True)
+            utils.save_model(model_D, f"{output_dir}/models/dis_epoch_{epoch:03}.pytorch", True)
 
     # ログ
     with open(output_dir + "/logs.pkl", "wb") as fp:
@@ -178,4 +169,4 @@ def test(cases):
                              50000//args.batch_size+1, "cifar10_train.pkl")
 
 if __name__ == "__main__":
-    train(4)
+    train(0)
