@@ -35,7 +35,7 @@ def load_dataset(batch_size):
     return dataloader
 
 def train(cases):
-    utils.load_settings(args, "settings/cifar.json", cases)
+    utils.load_settings(args, "settings/res128.json", cases)
     
     output_dir = f"res128_case{cases}"
 
@@ -157,7 +157,7 @@ def train(cases):
         pickle.dump(result, fp)
 
 def test(cases):
-    utils.load_settings(args, "settings/cifar.json", cases)
+    utils.load_settings(args, "settings/res128.json", cases)
     def g_func():
         x = Generator(args.base_ch, 32, 10, n_projected_dims=4).cuda()
         return x

@@ -178,4 +178,5 @@ def test(cases):
                              50000//args.batch_size+1, "cifar10_train.pkl")
 
 if __name__ == "__main__":
-    train(4)
+    for i in range(6):
+        test(i)

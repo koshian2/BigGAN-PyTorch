@@ -1,0 +1,9 @@
+[
+    {
+        "dataset": "anime",
+        "data_root_dir": "thumb",
+        "n_epoch": 501,
+        "n_classes": 176,
+        "n_projected_dims": 32
+    }
+]
